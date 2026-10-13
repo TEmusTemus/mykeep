@@ -1,6 +1,6 @@
 # MyKeep Project Foundation Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** Use a single-agent workflow by default for straightforward implementation, documentation, and configuration tasks. Use additional agents and repeated reviews only when higher-priority instructions permit and the work is complex architecture, authentication, security, or difficult debugging. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Establish the repository governance, architecture reference, delivery roadmap, GitHub templates, and issue plan required before MyKeep application feature work begins.
 

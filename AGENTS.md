@@ -30,6 +30,7 @@ Later issues will introduce a monorepo layout for the React frontend, FastAPI ba
 - Work from a synchronized `main` on a branch named `<type>/<issue>-<slug>`.
 - Make Conventional Commits: `<type>(<optional scope>): <description>`.
 - Every change must be linked to one GitHub issue and delivered through an issue-linked PR. Do not commit directly to `main`, force-push, merge, or deploy without explicit approval.
+- Use a single-agent workflow by default for straightforward implementation, documentation, and configuration work. Additional agents and repeated reviews are optional when permitted by higher-priority instructions; reserve them for complex architecture, authentication, security, or difficult debugging. Security-sensitive changes still require focused review and the applicable validation evidence.
 - Run the validations required by the affected area and record exact commands and results in the PR. CI must pass formatting, linting, type checks, tests, frontend production build, migration checks, dependency/security checks, and secret scanning when those tools exist.
 - Inspect the final diff and scan it for secrets before opening a PR. Never commit credentials, cookies, tokens, private member data, or file data; use local secret management and documented environment configuration instead.
 - A task that depends on another task must wait until the prerequisite PR is approved and merged. Do not rely on an unmerged branch as a dependency.

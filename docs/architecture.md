@@ -46,6 +46,10 @@ Files are soft-deleted for 30 days. Normal listing and download exclude them, ow
 
 The React/Vite frontend runs on Vercel. Containerized FastAPI runs on Cloud Run in `asia-southeast1` while remaining portable to a compatible Python host. Development, staging, and production use separate Supabase projects, and CORS allows only the exact Vercel origins for each environment.
 
+### Cross-origin session deployment
+
+When Vercel and Cloud Run use different origins, browser requests must opt in to credentials and FastAPI must return an exact allowed origin plus `Access-Control-Allow-Credentials`; wildcard origins are incompatible with credentialed requests. Session cookies need `Secure`, `HttpOnly`, and an appropriate `SameSite` setting—typically `None` for genuinely cross-site deployment—and should remain host-only on the API domain unless a verified custom-domain design requires otherwise. Cookie authentication also requires CSRF protection for state-changing endpoints, using origin/referer validation together with a CSRF token or custom request header. Validate this flow in the LINE LIFF in-app browser on supported devices because embedded-browser cookie policies can differ from ordinary browsers; do not assume third-party-cookie behavior is available.
+
 All secrets stay in server-side secret management. Supabase service credentials, the membership lookup secret, session secrets, LINE credentials, tokens, cookies, signed URLs, object keys, and filenames must not appear in Vite variables, browser bundles, committed files, CI logs, analytics, or ordinary structured logs. Logs use request IDs and redact sensitive headers and values. HTTPS, request-size limits, authentication and upload rate limits, and security headers are enforced. `/healthz` and `/readyz` expose no secrets.
 
 Managed database backups are required, and a documented restore exercise must be completed before production use.
