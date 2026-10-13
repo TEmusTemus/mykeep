@@ -1,0 +1,76 @@
+name: Bug report
+description: Report a reproducible problem in MyKeep.
+title: "[Bug]: "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for helping improve MyKeep. Do not include credentials, tokens,
+        cookies, private member data, filenames, object keys, signed URLs, or
+        uploaded file contents. If this may be a vulnerability, use the private
+        security reporting flow described in SECURITY.md instead of this form.
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: Provide the smallest safe, reproducible sequence of steps.
+      placeholder: |
+        1. ...
+        2. ...
+        3. ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected-behavior
+    attributes:
+      label: Expected behavior
+      description: Explain what should have happened.
+    validations:
+      required: true
+  - type: textarea
+    id: actual-behavior
+    attributes:
+      label: Actual behavior
+      description: Explain what happened instead, including any safe error message.
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Include relevant app version or commit, browser or device, and operating system.
+      placeholder: "App version/commit:\nBrowser or device:\nOperating system:"
+    validations:
+      required: true
+  - type: dropdown
+    id: severity
+    attributes:
+      label: Severity
+      description: How severely does this affect normal use?
+      options:
+        - Critical — prevents access or risks data loss
+        - High — major feature unavailable with no practical workaround
+        - Medium — feature degraded or workaround available
+        - Low — minor or cosmetic impact
+    validations:
+      required: true
+  - type: dropdown
+    id: security-impact
+    attributes:
+      label: Security or privacy impact
+      description: If this might expose data or bypass authorization, stop and report it privately through SECURITY.md.
+      options:
+        - No known security or privacy impact
+        - Unsure — report privately through SECURITY.md before sharing details
+        - Possible security or privacy impact — report privately through SECURITY.md
+    validations:
+      required: true
+  - type: textarea
+    id: attachments
+    attributes:
+      label: Safe attachments or additional context (optional)
+      description: Attach only redacted material. Never include credentials, tokens, cookies, private files, member data, filenames, object keys, signed URLs, or uploaded content.
+    validations:
+      required: false
