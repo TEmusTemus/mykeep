@@ -205,6 +205,10 @@ cython_debug/
 # Temporary file for partial code execution
 tempCodeRunnerFile.py
 
+# Node.js build and dependency artifacts
+node_modules/
+apps/web/dist/
+
 # Ruff stuff:
 .ruff_cache/
 
