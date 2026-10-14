@@ -244,4 +244,3 @@ Before opening the Issue #4 pull request, run schema/migration tests alongside
 the current frontend and backend checks; inspect the final migration diff; and
 scan it for secrets, raw member data, connection strings, tokens, service-role
 keys, filenames, object keys, and signed URLs.
-

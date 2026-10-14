@@ -193,7 +193,10 @@ Run: git diff --check main...HEAD; git diff --stat main...HEAD; rg -n --ignore-c
 
 Expected: no committed credential, raw identity, session material, or unrelated changes.
 
-- [ ] **Step 4: Commit, push, and open the PR**
+- [ ] **Step 4: Commit for review**
 
-Use Conventional Commits, push feat/4-supabase-schema, and create a PR targeting main with Closes #4. Include exact validation evidence, RLS/role design, migration impact, and confirmation that no Storage policies or application authentication endpoints were added. Do not merge or deploy.
-
+Use Conventional Commits after the validation evidence is collected. Do not push,
+open a PR, merge, or deploy until explicitly approved. The later PR must target
+main, use `Closes #4`, include exact validation evidence and the RLS/role
+design, and confirm that no Storage policies or application authentication
+endpoints were added.
