@@ -1,6 +1,6 @@
 begin;
 
-select plan(42);
+select plan(45);
 
 -- pgTAP is installed in the local extensions schema. This transaction-scoped
 -- grant exists only so assertions can run after SET ROLE mykeep_api.
@@ -225,22 +225,34 @@ select ok(
   (select count(*) from changed) = 0,
   'member B cannot soft-delete member A file'
 );
+select ok(
+  not app.set_file_deleted_state('22222222-2222-2222-2222-222222222222', true),
+  'member B cannot use the lifecycle function on member A file'
+);
 select set_config('mykeep.member_id', '11111111-1111-1111-1111-111111111111', true);
-select lives_ok(
+select throws_ok(
   $$update app.files
       set deleted_at = clock_timestamp()
     where id = '22222222-2222-2222-2222-222222222222'$$,
-  'member can soft-delete an owned file'
+  '42501',
+  null,
+  'ordinary updates cannot change the deletion lifecycle'
+);
+select ok(
+  app.set_file_deleted_state('22222222-2222-2222-2222-222222222222', true),
+  'member can soft-delete an owned file through the lifecycle function'
 );
 select ok(
   (select count(*) from app.files) = 0,
   'soft-deleted files are hidden from normal listing'
 );
-select lives_ok(
-  $$update app.files
-      set deleted_at = null
-    where id = '22222222-2222-2222-2222-222222222222'$$,
-  'member can restore an owned file'
+select ok(
+  app.set_file_deleted_state('22222222-2222-2222-2222-222222222222', false),
+  'member can restore an owned file through the lifecycle function'
+);
+select ok(
+  (select count(*) from app.files) = 1,
+  'restored file returns to the normal active listing'
 );
 select set_config('mykeep.member_id', 'dddddddd-dddd-dddd-dddd-dddddddddddd', true);
 select ok(

@@ -26,6 +26,13 @@ returning the connection to the pool. No connection may be reused with an open
 transaction. Rotation inserts the replacement session and marks the previous
 session rotated with that replacement UUID in the same transaction.
 
+Normal file listing and download queries remain limited to active rows by RLS.
+FastAPI must perform soft-delete and restore through
+`app.set_file_deleted_state(file_id, deleting)` after resolving member context;
+the function returns only whether the owner-valid state transition occurred.
+Do not use `RETURNING` on direct file lifecycle updates: deleted rows are
+intentionally not selectable, including through `RETURNING`.
+
 These settings are trustworthy only through this FastAPI boundary. A party able
 to execute arbitrary SQL with the runtime credential can set them too, so that
 credential is never exposed to browsers, logs, CI output, or untrusted code.

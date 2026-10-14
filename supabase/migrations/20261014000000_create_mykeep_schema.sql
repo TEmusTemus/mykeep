@@ -198,6 +198,32 @@ as $$
     and s.replacement_session_id is null
 $$;
 
+-- Deleted files are deliberately not selectable through the runtime role. This
+-- fixed function is the only lifecycle path: it returns no row data, requires
+-- the resolved enabled owner, and makes foreign, absent, or invalid-state
+-- requests indistinguishable with a false result.
+create function app.set_file_deleted_state(p_file_id uuid, p_delete boolean)
+returns boolean
+language plpgsql
+security definer
+set search_path = pg_catalog, app
+as $$
+declare
+  changed boolean;
+begin
+  update app.files
+  set deleted_at = case when p_delete then clock_timestamp() else null end,
+      updated_at = clock_timestamp()
+  where id = p_file_id
+    and member_id = app.current_member_id()
+    and app.current_member_is_enabled()
+    and case when p_delete then deleted_at is null else deleted_at is not null end
+  returning true into changed;
+
+  return coalesce(changed, false);
+end;
+$$;
+
 revoke all on schema app from public, anon, authenticated;
 revoke all on all tables in schema app from public, anon, authenticated;
 revoke all on all sequences in schema app from public, anon, authenticated;
@@ -215,6 +241,7 @@ grant execute on function app.current_session_hash() to mykeep_api;
 grant execute on function app.current_member_is_enabled() to mykeep_api;
 grant execute on function app.resolve_verified_lookup() to mykeep_api;
 grant execute on function app.resolve_presented_session() to mykeep_api;
+grant execute on function app.set_file_deleted_state(uuid, boolean) to mykeep_api;
 
 -- The Supabase migration/test administrator can assume the restricted role to
 -- exercise RLS. This membership is deliberately one-way: mykeep_api cannot
@@ -253,7 +280,11 @@ create policy files_insert_owned on app.files
 create policy files_update_owned on app.files
   for update to mykeep_api
   using (member_id = app.current_member_id() and app.current_member_is_enabled())
-  with check (member_id = app.current_member_id() and app.current_member_is_enabled());
+  with check (
+    member_id = app.current_member_id()
+    and app.current_member_is_enabled()
+    and deleted_at is null
+  );
 create policy files_delete_denied on app.files
   as restrictive
   for delete to mykeep_api
