@@ -25,6 +25,12 @@ REQUIRED_SNIPPETS = (
     "pip-audit --skip-editable",
     "gitleaks/gitleaks-action@v2",
     "fetch-depth: 0",
+    "database:",
+    "supabase/setup-cli@v1",
+    "version: 2.76.8",
+    "supabase start",
+    "supabase db reset",
+    "supabase test db",
 )
 
 
@@ -44,6 +50,13 @@ def test_ci_workflow_contract_rejects_a_missing_gate() -> None:
 
     with pytest.raises(AssertionError, match="npm run build"):
         assert_required_ci_gates(workflow.replace("npm run build", ""))
+
+
+def test_ci_workflow_contract_rejects_a_missing_database_test() -> None:
+    workflow = "\n".join(REQUIRED_SNIPPETS)
+
+    with pytest.raises(AssertionError, match="supabase test db"):
+        assert_required_ci_gates(workflow.replace("supabase test db", ""))
 
 
 def test_api_test_dependency_uses_a_non_vulnerable_pytest_version() -> None:

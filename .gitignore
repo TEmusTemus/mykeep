@@ -209,6 +209,9 @@ tempCodeRunnerFile.py
 node_modules/
 apps/web/dist/
 
+# Project-local Git worktrees
+.worktrees/
+
 # Ruff stuff:
 .ruff_cache/
 

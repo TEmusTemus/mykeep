@@ -52,6 +52,24 @@ jobs:
       - run: ruff check .
       - run: pytest
 
+  database:
+    name: Database migrations and RLS
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: 2.76.8
+
+      # This starts only the runner-local Docker services. No hosted project,
+      # credentials, or destructive database target is configured here.
+      - run: supabase start
+      - run: supabase db reset
+      - run: supabase test db
+      - run: supabase db reset
+      - run: supabase test db
+
   security:
     name: Dependency and secret checks
     runs-on: ubuntu-24.04
