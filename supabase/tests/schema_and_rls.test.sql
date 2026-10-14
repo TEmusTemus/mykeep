@@ -70,27 +70,32 @@ insert into app.files (
 );
 
 insert into app.sessions (
-  id, member_id, credential_hash, issued_at, expires_at
+  id, member_id, credential_hash, issued_at, expires_at, rotated_at, revoked_at,
+  replacement_session_id
 ) values
   (
     '33333333-3333-3333-3333-333333333333',
     '11111111-1111-1111-1111-111111111111',
-    decode(repeat('33', 32), 'hex'), clock_timestamp(), clock_timestamp() + interval '1 hour'
+    decode(repeat('33', 32), 'hex'), clock_timestamp(), clock_timestamp() + interval '1 hour',
+    null, null, null
   ),
   (
     '44444444-4444-4444-4444-444444444444',
     '11111111-1111-1111-1111-111111111111',
-    decode(repeat('44', 32), 'hex'), clock_timestamp(), clock_timestamp() - interval '1 hour'
+    decode(repeat('44', 32), 'hex'), clock_timestamp(), clock_timestamp() - interval '1 hour',
+    null, null, null
   ),
   (
     '55555555-5555-5555-5555-555555555555',
     '11111111-1111-1111-1111-111111111111',
-    decode(repeat('55', 32), 'hex'), clock_timestamp(), clock_timestamp() + interval '1 hour', clock_timestamp()
+    decode(repeat('55', 32), 'hex'), clock_timestamp(), clock_timestamp() + interval '1 hour',
+    null, clock_timestamp(), null
   ),
   (
     '66666666-6666-6666-6666-666666666666',
     'dddddddd-dddd-dddd-dddd-dddddddddddd',
-    decode(repeat('66', 32), 'hex'), clock_timestamp(), clock_timestamp() + interval '1 hour'
+    decode(repeat('66', 32), 'hex'), clock_timestamp(), clock_timestamp() + interval '1 hour',
+    null, null, null
   ),
   (
     '77777777-7777-7777-7777-777777777777',
@@ -101,27 +106,28 @@ insert into app.sessions (
   (
     '88888888-8888-8888-8888-888888888888',
     '11111111-1111-1111-1111-111111111111',
-    decode(repeat('88', 32), 'hex'), clock_timestamp(), clock_timestamp() + interval '1 hour'
+    decode(repeat('88', 32), 'hex'), clock_timestamp(), clock_timestamp() + interval '1 hour',
+    null, null, null
   ),
   (
     '99999999-9999-9999-9999-999999999999',
     '11111111-1111-1111-1111-111111111111',
-    decode(repeat('99', 32), 'hex'), clock_timestamp(), clock_timestamp() + interval '1 hour'
+    decode(repeat('99', 32), 'hex'), clock_timestamp(), clock_timestamp() + interval '1 hour',
+    null, null, null
   );
 
 set local role mykeep_api;
 
-select is(app.current_member_id(), null, 'missing member context resolves to null');
-select is(app.current_lookup_hash(), null, 'missing lookup context resolves to null');
-select is(app.current_session_hash(), null, 'missing session context resolves to null');
+select ok(app.current_member_id() is null, 'missing member context resolves to null');
+select ok(app.current_lookup_hash() is null, 'missing lookup context resolves to null');
+select ok(app.current_session_hash() is null, 'missing session context resolves to null');
 select set_config('mykeep.lookup_hash', encode(decode(repeat('11', 32), 'hex'), 'hex'), true);
-select is(
-  app.resolve_verified_lookup(),
-  '11111111-1111-1111-1111-111111111111'::uuid,
+select ok(
+  app.resolve_verified_lookup() is not distinct from '11111111-1111-1111-1111-111111111111'::uuid,
   'verified enabled lookup resolves a member UUID'
 );
 select set_config('mykeep.lookup_hash', encode(decode(repeat('dd', 32), 'hex'), 'hex'), true);
-select is(app.resolve_verified_lookup(), null, 'disabled lookup does not resolve a member UUID');
+select ok(app.resolve_verified_lookup() is null, 'disabled lookup does not resolve a member UUID');
 
 select set_config('mykeep.member_id', '11111111-1111-1111-1111-111111111111', true);
 select lives_ok(
@@ -200,19 +206,17 @@ select lives_ok(
   'rotation atomically creates a replacement and retires the previous session'
 );
 select set_config('mykeep.member_id', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', true);
-select is(
-  (select count(*) from app.files),
-  0::bigint,
+select ok(
+  (select count(*) from app.files) = 0,
   'member B cannot read member A files'
 );
-select is(
+select ok(
   (with changed as (
     update app.files
     set deleted_at = clock_timestamp()
     where id = '22222222-2222-2222-2222-222222222222'
     returning id
-  ) select count(*) from changed),
-  0::bigint,
+  ) select count(*) from changed) = 0,
   'member B cannot soft-delete member A file'
 );
 select set_config('mykeep.member_id', '11111111-1111-1111-1111-111111111111', true);
@@ -222,9 +226,8 @@ select lives_ok(
     where id = '22222222-2222-2222-2222-222222222222'$$,
   'member can soft-delete an owned file'
 );
-select is(
-  (select count(*) from app.files),
-  0::bigint,
+select ok(
+  (select count(*) from app.files) = 0,
   'soft-deleted files are hidden from normal listing'
 );
 select lives_ok(
@@ -234,9 +237,8 @@ select lives_ok(
   'member can restore an owned file'
 );
 select set_config('mykeep.member_id', 'dddddddd-dddd-dddd-dddd-dddddddddddd', true);
-select is(
-  (select count(*) from app.files),
-  0::bigint,
+select ok(
+  (select count(*) from app.files) = 0,
   'disabled members cannot access files even if context is set incorrectly'
 );
 select set_config('mykeep.member_id', '', true);
@@ -257,31 +259,31 @@ reset role;
 select set_config('mykeep.member_id', '', true);
 set local role mykeep_api;
 select set_config('mykeep.session_hash', encode(decode(repeat('33', 32), 'hex'), 'hex'), true);
-select is(
-  (select id from app.resolve_presented_session()),
-  '33333333-3333-3333-3333-333333333333'::uuid,
+select ok(
+  (select id from app.resolve_presented_session())
+    is not distinct from '33333333-3333-3333-3333-333333333333'::uuid,
   'active session resolves through restricted runtime role'
 );
 select set_config('mykeep.session_hash', encode(decode(repeat('44', 32), 'hex'), 'hex'), true);
-select is((select id from app.resolve_presented_session()), null, 'expired session does not resolve');
+select ok((select id from app.resolve_presented_session()) is null, 'expired session does not resolve');
 select set_config('mykeep.session_hash', encode(decode(repeat('55', 32), 'hex'), 'hex'), true);
-select is((select id from app.resolve_presented_session()), null, 'revoked session does not resolve');
+select ok((select id from app.resolve_presented_session()) is null, 'revoked session does not resolve');
 select set_config('mykeep.session_hash', encode(decode(repeat('66', 32), 'hex'), 'hex'), true);
-select is((select id from app.resolve_presented_session()), null, 'disabled member session does not resolve');
+select ok((select id from app.resolve_presented_session()) is null, 'disabled member session does not resolve');
 select set_config('mykeep.session_hash', encode(decode(repeat('77', 32), 'hex'), 'hex'), true);
-select is((select id from app.resolve_presented_session()), null, 'rotated session does not resolve');
+select ok((select id from app.resolve_presented_session()) is null, 'rotated session does not resolve');
 select set_config('mykeep.session_hash', encode(decode(repeat('88', 32), 'hex'), 'hex'), true);
-select is(
-  (select id from app.resolve_presented_session()),
-  '88888888-8888-8888-8888-888888888888'::uuid,
+select ok(
+  (select id from app.resolve_presented_session())
+    is not distinct from '88888888-8888-8888-8888-888888888888'::uuid,
   'replacement session resolves after rotation'
 );
 select set_config('mykeep.session_hash', encode(decode(repeat('99', 32), 'hex'), 'hex'), true);
-select is((select id from app.resolve_presented_session()), null, 'atomically rotated credential does not resolve');
+select ok((select id from app.resolve_presented_session()) is null, 'atomically rotated credential does not resolve');
 select set_config('mykeep.session_hash', encode(decode(repeat('ff', 32), 'hex'), 'hex'), true);
-select is(
-  (select id from app.resolve_presented_session()),
-  'ffffffff-ffff-ffff-ffff-ffffffffffff'::uuid,
+select ok(
+  (select id from app.resolve_presented_session())
+    is not distinct from 'ffffffff-ffff-ffff-ffff-ffffffffffff'::uuid,
   'atomically created replacement credential resolves'
 );
 
