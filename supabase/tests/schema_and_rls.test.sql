@@ -215,13 +215,14 @@ select ok(
   (select count(*) from app.files) = 0,
   'member B cannot read member A files'
 );
+with changed as (
+  update app.files
+  set deleted_at = clock_timestamp()
+  where id = '22222222-2222-2222-2222-222222222222'
+  returning id
+)
 select ok(
-  (with changed as (
-    update app.files
-    set deleted_at = clock_timestamp()
-    where id = '22222222-2222-2222-2222-222222222222'
-    returning id
-  ) select count(*) from changed) = 0,
+  (select count(*) from changed) = 0,
   'member B cannot soft-delete member A file'
 );
 select set_config('mykeep.member_id', '11111111-1111-1111-1111-111111111111', true);
