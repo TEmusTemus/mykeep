@@ -9,6 +9,7 @@ REQUIRED_SNIPPETS = (
     "pull_request:",
     "branches: [main]",
     "contents: read",
+    "pull-requests: read",
     "node-version: 24",
     "npm ci",
     "npm run lint",

@@ -11,7 +11,7 @@
 ## Global Constraints
 
 - Trigger only for pull requests targeting \`main\`.
-- Set workflow permissions to \`contents: read\`; do not introduce secrets.
+- Set workflow permissions to read-only \`contents\` and \`pull-requests\`; do not introduce secrets.
 - Use existing npm workspace scripts and the API's Python project configuration.
 - Fail on high-or-critical npm audit findings and on every auditable pip-audit finding.
 - Scan pull-request changes with Gitleaks and fetch full history needed for the comparison.

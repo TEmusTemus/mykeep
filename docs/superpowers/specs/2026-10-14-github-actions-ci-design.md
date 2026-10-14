@@ -29,9 +29,11 @@ Python audit skips only the editable local API package, which is private and
 therefore cannot be resolved through PyPI, while auditing every third-party
 dependency.
 
-Each job uses explicit tool versions, minimal `contents: read` permission, and
-dependency caching where supported. Workflow concurrency cancels an older run
-for the same pull request when a newer commit is pushed.
+Each job uses explicit tool versions, minimal read-only `contents` and
+`pull-requests` permissions, and dependency caching where supported. The
+pull-request permission is required for Gitleaks to enumerate PR commits.
+Workflow concurrency cancels an older run for the same pull request when a
+newer commit is pushed.
 
 ## Failure handling and verification
 
