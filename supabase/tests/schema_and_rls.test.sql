@@ -7,10 +7,26 @@ select has_table('app', 'members', 'creates members');
 select has_table('app', 'files', 'creates files');
 select has_table('app', 'audit_events', 'creates audit events');
 select has_table('app', 'sessions', 'creates sessions');
-select row_security_is_enabled('app', 'members', 'enables RLS on members');
-select row_security_is_enabled('app', 'files', 'enables RLS on files');
-select row_security_is_enabled('app', 'audit_events', 'enables RLS on audit events');
-select row_security_is_enabled('app', 'sessions', 'enables RLS on sessions');
+select ok(
+  (select c.relrowsecurity from pg_class as c join pg_namespace as n on n.oid = c.relnamespace
+   where n.nspname = 'app' and c.relname = 'members'),
+  'enables RLS on members'
+);
+select ok(
+  (select c.relrowsecurity from pg_class as c join pg_namespace as n on n.oid = c.relnamespace
+   where n.nspname = 'app' and c.relname = 'files'),
+  'enables RLS on files'
+);
+select ok(
+  (select c.relrowsecurity from pg_class as c join pg_namespace as n on n.oid = c.relnamespace
+   where n.nspname = 'app' and c.relname = 'audit_events'),
+  'enables RLS on audit events'
+);
+select ok(
+  (select c.relrowsecurity from pg_class as c join pg_namespace as n on n.oid = c.relnamespace
+   where n.nspname = 'app' and c.relname = 'sessions'),
+  'enables RLS on sessions'
+);
 
 select ok(
   not has_table_privilege('anon', 'app.files', 'select'),

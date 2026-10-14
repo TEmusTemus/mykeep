@@ -12,6 +12,12 @@ assume that restricted role with `SET LOCAL ROLE mykeep_api`. It must not be a
 member of a service, migration, superuser, or `BYPASSRLS` role. The service
 role is never used for member-scoped work.
 
+The migration administrator (`postgres` in Supabase's local migration/test
+environment) receives one-way membership in `mykeep_api` so the pgTAP suite
+can execute as the restricted role. That administrative membership does not
+give `mykeep_api` any ability to assume `postgres`, and FastAPI never uses the
+administrator credential.
+
 For every request, FastAPI must begin an explicit transaction, use
 parameterized SQL to set only `mykeep.lookup_hash` or `mykeep.session_hash`,
 call the restricted resolver, verify the enabled member and valid session

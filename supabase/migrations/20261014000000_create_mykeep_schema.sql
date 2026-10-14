@@ -216,6 +216,11 @@ grant execute on function app.current_member_is_enabled() to mykeep_api;
 grant execute on function app.resolve_verified_lookup() to mykeep_api;
 grant execute on function app.resolve_presented_session() to mykeep_api;
 
+-- The Supabase migration/test administrator can assume the restricted role to
+-- exercise RLS. This membership is deliberately one-way: mykeep_api cannot
+-- assume postgres, and FastAPI never connects as postgres.
+grant mykeep_api to postgres;
+
 alter table app.members enable row level security;
 alter table app.members force row level security;
 alter table app.files enable row level security;
