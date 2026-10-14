@@ -253,6 +253,7 @@ grant select, update on app.files to mykeep_file_lifecycle;
 grant execute on function app.current_member_id() to mykeep_file_lifecycle;
 grant execute on function app.current_member_is_enabled() to mykeep_file_lifecycle;
 grant execute on function app.resolve_presented_session() to mykeep_file_lifecycle;
+grant mykeep_file_lifecycle to postgres;
 alter function app.set_file_deleted_state(uuid, boolean) owner to mykeep_file_lifecycle;
 revoke create on schema app from mykeep_file_lifecycle;
 
