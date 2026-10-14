@@ -24,7 +24,10 @@ The frontend job installs dependencies reproducibly with `npm ci` and runs
 formatting, linting, type checking, tests, and the production build. The
 backend job installs the API development dependencies and runs Ruff formatting,
 Ruff linting, and pytest. The security job checks Node and Python dependencies
-for known vulnerabilities and scans the checked-out repository for secrets.
+for known vulnerabilities and scans the checked-out repository for secrets. The
+Python audit skips only the editable local API package, which is private and
+therefore cannot be resolved through PyPI, while auditing every third-party
+dependency.
 
 Each job uses explicit tool versions, minimal `contents: read` permission, and
 dependency caching where supported. Workflow concurrency cancels an older run
