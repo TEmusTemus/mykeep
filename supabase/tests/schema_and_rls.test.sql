@@ -2,6 +2,10 @@ begin;
 
 select plan(42);
 
+-- pgTAP is installed in the local extensions schema. This transaction-scoped
+-- grant exists only so assertions can run after SET ROLE mykeep_api.
+grant usage on schema extensions to mykeep_api;
+
 select has_schema('app', 'creates the application schema');
 select has_table('app', 'members', 'creates members');
 select has_table('app', 'files', 'creates files');
@@ -82,7 +86,8 @@ insert into app.sessions (
   (
     '44444444-4444-4444-4444-444444444444',
     '11111111-1111-1111-1111-111111111111',
-    decode(repeat('44', 32), 'hex'), clock_timestamp(), clock_timestamp() - interval '1 hour',
+    decode(repeat('44', 32), 'hex'), clock_timestamp() - interval '2 hours',
+    clock_timestamp() - interval '1 hour',
     null, null, null
   ),
   (
