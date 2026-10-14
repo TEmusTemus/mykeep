@@ -28,8 +28,10 @@ session rotated with that replacement UUID in the same transaction.
 
 Normal file listing and download queries remain limited to active rows by RLS.
 FastAPI must perform soft-delete and restore through
-`app.set_file_deleted_state(file_id, deleting)` after resolving member context;
-the function returns only whether the owner-valid state transition occurred.
+`app.set_file_deleted_state(file_id, deleting)` after resolving member and
+presented-session context; the function requires that the valid, enabled
+session resolves to that same member and returns only whether the owner-valid
+state transition occurred.
 Do not use `RETURNING` on direct file lifecycle updates: deleted rows are
 intentionally not selectable, including through `RETURNING`.
 

@@ -15,6 +15,16 @@ begin
       noreplication
       nobypassrls;
   end if;
+  if not exists (select 1 from pg_roles where rolname = 'mykeep_file_lifecycle') then
+    create role mykeep_file_lifecycle
+      nologin
+      noinherit
+      nosuperuser
+      nocreatedb
+      nocreaterole
+      noreplication
+      bypassrls;
+  end if;
 end;
 $$;
 
@@ -217,6 +227,11 @@ begin
   where id = p_file_id
     and member_id = app.current_member_id()
     and app.current_member_is_enabled()
+    and exists (
+      select 1
+      from app.resolve_presented_session() as session_context
+      where session_context.member_id = app.current_member_id()
+    )
     and case when p_delete then deleted_at is null else deleted_at is not null end
   returning true into changed;
 
@@ -229,6 +244,17 @@ revoke all on all tables in schema app from public, anon, authenticated;
 revoke all on all sequences in schema app from public, anon, authenticated;
 revoke all on all functions in schema app from public, anon, authenticated;
 revoke all on type app.member_status, app.audit_outcome from public, anon, authenticated;
+
+-- This non-login owner has only the file privileges needed by the fixed
+-- lifecycle function. Its RLS bypass is confined to function execution;
+-- neither the runtime role nor browser-facing roles can assume it.
+grant usage, create on schema app to mykeep_file_lifecycle;
+grant select, update on app.files to mykeep_file_lifecycle;
+grant execute on function app.current_member_id() to mykeep_file_lifecycle;
+grant execute on function app.current_member_is_enabled() to mykeep_file_lifecycle;
+grant execute on function app.resolve_presented_session() to mykeep_file_lifecycle;
+alter function app.set_file_deleted_state(uuid, boolean) owner to mykeep_file_lifecycle;
+revoke create on schema app from mykeep_file_lifecycle;
 
 grant usage on schema app to mykeep_api;
 grant usage on type app.audit_outcome to mykeep_api;

@@ -1,6 +1,6 @@
 begin;
 
-select plan(45);
+select plan(60);
 
 -- pgTAP is installed in the local extensions schema. This transaction-scoped
 -- grant exists only so assertions can run after SET ROLE mykeep_api.
@@ -55,6 +55,50 @@ select ok(
 select ok(
   not (select rolinherit from pg_roles where rolname = 'mykeep_api'),
   'runtime role does not inherit elevated privileges'
+);
+select ok(
+  (select p.proowner::regrole::text
+   from pg_proc as p join pg_namespace as n on n.oid = p.pronamespace
+   where n.nspname = 'app' and p.proname = 'set_file_deleted_state')
+    = 'mykeep_file_lifecycle',
+  'file lifecycle function has its dedicated owner'
+);
+select ok(
+  (select rolbypassrls from pg_roles where rolname = 'mykeep_file_lifecycle'),
+  'file lifecycle owner bypasses RLS only within the fixed function'
+);
+select ok(
+  not (select rolcanlogin from pg_roles where rolname = 'mykeep_file_lifecycle'),
+  'file lifecycle owner cannot log in directly'
+);
+select ok(
+  not exists (
+    select 1
+    from pg_proc as p
+    join pg_namespace as n on n.oid = p.pronamespace
+    cross join lateral aclexplode(coalesce(p.proacl, acldefault('f', p.proowner))) as privilege
+    where n.nspname = 'app'
+      and p.proname = 'set_file_deleted_state'
+      and privilege.grantee = 0
+      and privilege.privilege_type = 'EXECUTE'
+  ),
+  'PUBLIC cannot execute the file lifecycle function'
+);
+select ok(
+  not has_function_privilege('anon', 'app.set_file_deleted_state(uuid, boolean)', 'execute'),
+  'anon cannot execute the file lifecycle function'
+);
+select ok(
+  not has_function_privilege('authenticated', 'app.set_file_deleted_state(uuid, boolean)', 'execute'),
+  'authenticated cannot execute the file lifecycle function'
+);
+select ok(
+  has_function_privilege('mykeep_api', 'app.set_file_deleted_state(uuid, boolean)', 'execute'),
+  'runtime role can execute the file lifecycle function'
+);
+select ok(
+  not pg_has_role('mykeep_api', 'mykeep_file_lifecycle', 'member'),
+  'runtime role cannot assume the file lifecycle owner'
 );
 
 insert into app.members (id, lookup_hash, status) values
@@ -118,6 +162,12 @@ insert into app.sessions (
     '99999999-9999-9999-9999-999999999999',
     '11111111-1111-1111-1111-111111111111',
     decode(repeat('99', 32), 'hex'), clock_timestamp(), clock_timestamp() + interval '1 hour',
+    null, null, null
+  ),
+  (
+    '12121212-1212-1212-1212-121212121212',
+    'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
+    decode(repeat('12', 32), 'hex'), clock_timestamp(), clock_timestamp() + interval '1 hour',
     null, null, null
   );
 
@@ -211,6 +261,7 @@ select lives_ok(
   'rotation atomically creates a replacement and retires the previous session'
 );
 select set_config('mykeep.member_id', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', true);
+select set_config('mykeep.session_hash', encode(decode(repeat('12', 32), 'hex'), 'hex'), true);
 select ok(
   (select count(*) from app.files) = 0,
   'member B cannot read member A files'
@@ -230,6 +281,11 @@ select ok(
   'member B cannot use the lifecycle function on member A file'
 );
 select set_config('mykeep.member_id', '11111111-1111-1111-1111-111111111111', true);
+select ok(
+  not app.set_file_deleted_state('22222222-2222-2222-2222-222222222222', true),
+  'member context must match the valid presented session'
+);
+select set_config('mykeep.session_hash', encode(decode(repeat('33', 32), 'hex'), 'hex'), true);
 select throws_ok(
   $$update app.files
       set deleted_at = clock_timestamp()
@@ -243,6 +299,10 @@ select ok(
   'member can soft-delete an owned file through the lifecycle function'
 );
 select ok(
+  not app.set_file_deleted_state('22222222-2222-2222-2222-222222222222', true),
+  'repeated soft-delete does not change an already deleted file'
+);
+select ok(
   (select count(*) from app.files) = 0,
   'soft-deleted files are hidden from normal listing'
 );
@@ -251,15 +311,40 @@ select ok(
   'member can restore an owned file through the lifecycle function'
 );
 select ok(
+  not app.set_file_deleted_state('22222222-2222-2222-2222-222222222222', false),
+  'repeated restore does not change an active file'
+);
+select ok(
   (select count(*) from app.files) = 1,
   'restored file returns to the normal active listing'
 );
 select set_config('mykeep.member_id', 'dddddddd-dddd-dddd-dddd-dddddddddddd', true);
+select set_config('mykeep.session_hash', encode(decode(repeat('66', 32), 'hex'), 'hex'), true);
 select ok(
   (select count(*) from app.files) = 0,
   'disabled members cannot access files even if context is set incorrectly'
 );
+select ok(
+  not app.set_file_deleted_state('eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee', true),
+  'disabled member cannot invoke the file lifecycle function'
+);
+select set_config('mykeep.member_id', '11111111-1111-1111-1111-111111111111', true);
+select set_config('mykeep.session_hash', encode(decode(repeat('44', 32), 'hex'), 'hex'), true);
+select ok(
+  not app.set_file_deleted_state('22222222-2222-2222-2222-222222222222', true),
+  'expired session cannot invoke the file lifecycle function'
+);
+select set_config('mykeep.session_hash', encode(decode(repeat('55', 32), 'hex'), 'hex'), true);
+select ok(
+  not app.set_file_deleted_state('22222222-2222-2222-2222-222222222222', true),
+  'revoked session cannot invoke the file lifecycle function'
+);
+select ok(
+  (select count(*) from app.files) = 1,
+  'invalid session lifecycle requests leave the active file unchanged'
+);
 select set_config('mykeep.member_id', '', true);
+select set_config('mykeep.session_hash', '', true);
 select lives_ok(
   $$insert into app.audit_events (event_type, outcome, request_id, actor_member_id)
       values ('authentication_failed', 'denied', '22222222-2222-2222-2222-222222222222', null)$$,
