@@ -72,11 +72,36 @@ RLS helper functions read this context. Policies compare the context to the
 relevant row. SET LOCAL scopes the values to one transaction, preventing
 identity leakage through connection pooling.
 
-The context is trustworthy because FastAPI sets it only after server-side
-verification; it is never populated from a caller-provided owner ID, request
-body, URL parameter, or browser-issued Supabase identity. RLS remains defense
-in depth against application-query mistakes, while FastAPI remains the primary
-authentication and authorization boundary.
+The context is trusted only within the FastAPI execution boundary. It is not
+tamper-proof against arbitrary SQL executed with the runtime role's database
+credentials. FastAPI must use parameterized queries, never compose SQL from
+request data, and keep that least-privilege credential unavailable to browsers,
+operators without a runtime need, logs, CI output, and untrusted code.
+
+Every operation uses an explicit transaction: FastAPI sets context with SET
+LOCAL before its first protected query, commits or rolls back before returning
+the connection to the pool, and never reuses a connection with an open
+transaction. Pooling configuration must preserve transaction isolation. RLS
+remains defense in depth against application-query mistakes, while FastAPI
+remains the primary authentication and authorization boundary.
+
+### Two-stage identity resolution
+
+Identity resolution deliberately has no caller-supplied member UUID.
+
+1. FastAPI first verifies a LINE token and derives its HMAC lookup hash, or
+   hashes the opaque MyKeep session cookie. It sets only the corresponding
+   lookup or session-hash context and uses a restricted RLS lookup to find the
+   candidate record.
+2. FastAPI then checks that the candidate member is enabled. For a session, it
+   also checks that the stored token hash matches, the session is unexpired,
+   unrevoked, and unrotated. A failure resolves no member.
+3. Only after both checks succeed does FastAPI set mykeep.member_id to the
+   resolved UUID. All member-scoped file, session, and audit operations then
+   use this resolved context.
+
+This sequence lets the database support the existing LINE and cookie flows
+without introducing Supabase Auth, a browser JWT, or a URL/body owner ID.
 
 ### Direct roles
 
@@ -130,10 +155,23 @@ later approved requirement grants a narrower capability.
 - member_id UUID not null references members(id)
 - unique 32-byte session-token hash
 - issued, expiry, rotation, and revocation timestamps
+- nullable replacement-session UUID that references a session for the same
+  member
 
 The table stores only a hash of the session credential. Constraints reject
-invalid hash lengths and expiry/lifecycle ordering. Partial indexes support
-active-session lookup and revocation checks.
+invalid hash lengths and expiry/lifecycle ordering. The replacement reference
+uses a composite foreign key so a session cannot rotate into another member's
+session. A check requires rotated_at and replacement_session_id to be either
+both null or both non-null.
+
+The intended session-resolution query accepts a credential only when its hash
+matches and expires_at is later than the database clock, revoked_at is null,
+rotated_at is null, and replacement_session_id is null. Rotation inserts the
+replacement session and marks the old row rotated in the same transaction.
+Therefore the prior credential cannot remain valid through the approved
+resolution path after that transaction commits. Revocation updates revoked_at;
+expiry is evaluated by the resolver rather than relying on a delayed cleanup
+job. Partial indexes support active-session lookup and revocation checks.
 
 ## RLS policies
 
@@ -148,12 +186,25 @@ Every table has ENABLE ROW LEVEL SECURITY and FORCE ROW LEVEL SECURITY.
 - sessions: session resolution is limited to the transaction's presented
   hashed cookie; after resolution, member-scoped access requires the resolved
   member UUID.
-- audit_events: insertion is narrowly limited to the runtime context;
-  mutation is denied.
+- audit_events: insertion with a non-null actor requires actor_member_id to
+  equal the resolved member UUID; mutation is denied. An event before member
+  resolution must have a null actor_member_id and may use only the
+  unauthenticated event form.
 
 Each operation uses a distinct policy rather than a broad FOR ALL policy.
 Table grants and policies are declared together because grants are evaluated
 before RLS.
+
+### Unauthenticated audit events
+
+Authentication failures and other pre-resolution events are recorded with a
+null actor_member_id, a bounded event type and outcome, and a request ID. They
+do not store a supplied LINE subject, lookup hash, token, cookie, or free-form
+error payload. The audit insert policy permits this form only when no member
+context is set. Once a member context is set, a non-null actor must equal that
+context; the runtime cannot insert an audit row naming a different member.
+This protection depends on the same trusted FastAPI boundary and parameterized
+query requirement as the rest of the RLS design.
 
 ## Test strategy
 
@@ -171,8 +222,16 @@ Database tests run against local Supabase/PostgreSQL:
    cannot read, mutate, soft-delete, restore, or reassign them.
 6. Prove anon and authenticated fail before RLS because they lack grants.
 7. Prove audit events can be appended through the intended runtime path and
-   cannot be updated or deleted.
-8. Exercise the disposable rollback path, then confirm reapplication works.
+   cannot be updated or deleted; prove unauthenticated events require a null
+   actor and authenticated events cannot name a different member.
+8. Prove a transaction that sets member A context leaves no context available
+   after commit or rollback, then verify a reused pooled connection cannot read
+   member A data before member B context is set.
+9. Prove a disabled member fails the second-stage lookup and gains no
+   member-scoped access.
+10. Prove expired, revoked, and rotated session hashes fail resolution, while
+    the replacement credential succeeds after an atomic rotation.
+11. Exercise the disposable rollback path, then confirm reapplication works.
 
 ## CI and review
 
